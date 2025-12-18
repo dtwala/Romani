@@ -1,6 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { SelectedGenre } from '../types';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface DrumStep {
   active: boolean;
@@ -81,6 +83,22 @@ const PatternLab: React.FC<PatternLabProps> = ({ selectedGenre }) => {
     }
   }, [selectedGenre]);
 
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    const title = `Pattern Lab Profile: ${selectedGenre?.sub}`;
+    const filename = `pattern_${selectedGenre?.sub.toLowerCase()}`;
+    
+    if (format === 'pdf' || format === 'docx') {
+      const sections = [
+        { heading: 'Chord Progression', content: activePattern.chords.join(' - ') },
+        { heading: 'Rhythmic Configuration', content: `Kick: ${activePattern.kick.map(s => s ? '1' : '0').join('')}\nSnare: ${activePattern.snare.map(s => s ? '1' : '0').join('')}\nHi-hat: ${activePattern.hihat.map(s => s ? '1' : '0').join('')}` }
+      ];
+      if (format === 'pdf') await exportToPDF(title, sections, filename);
+      else await exportToDocx(title, sections, filename);
+    } else {
+      await exportToImage('pattern-lab-visual-area', format, filename);
+    }
+  };
+
   const GridRow = ({ label, steps, color }: { label: string, steps: boolean[], color: string }) => (
     <div className="flex items-center gap-4 group">
       <div className="w-12 text-[10px] font-black text-zinc-500 uppercase tracking-tighter text-right group-hover:text-zinc-300 transition-colors">
@@ -116,12 +134,15 @@ const PatternLab: React.FC<PatternLabProps> = ({ selectedGenre }) => {
   }
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div id="pattern-lab-visual-area" className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 bg-zinc-950/20 p-4 rounded-3xl">
       {/* Chord Progression Panel */}
-      <section className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md">
+      <section className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md relative">
+        <div className="absolute top-8 right-8">
+           <ExportMenu onExport={handleExport} />
+        </div>
         <div className="flex justify-between items-center mb-8">
-          <div>
-            <h3 className="text-xs font-black text-blue-500 uppercase tracking-widest mb-1">Harmonic Architecture</h3>
+          <div className="pr-40">
+            <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Harmonic Architecture</h3>
             <p className="text-xl font-bold text-white">Suggested Progression: {selectedGenre.sub}</p>
           </div>
           <div className="px-3 py-1 bg-blue-900/20 border border-blue-500/30 rounded-full text-blue-400 text-[10px] font-black uppercase">
@@ -149,7 +170,7 @@ const PatternLab: React.FC<PatternLabProps> = ({ selectedGenre }) => {
       <section className="flex-1 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h3 className="text-xs font-black text-emerald-500 uppercase tracking-widest mb-1">Rhythmic Matrix</h3>
+            <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Rhythmic Matrix</h3>
             <p className="text-xl font-bold text-white">16-Step Sequencing Protocol</p>
           </div>
           <div className="flex items-center gap-6">
@@ -179,7 +200,6 @@ const PatternLab: React.FC<PatternLabProps> = ({ selectedGenre }) => {
           <div className="max-w-md">
             <h4 className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-2">Engineering Insight</h4>
             <p className="text-xs text-zinc-500 leading-relaxed">
-              {/* FIX: Use indexOf(true) and lastIndexOf(true) for boolean search instead of predicate functions */}
               The groove of {selectedGenre.sub} relies heavily on the {activePattern.snare.filter(s => s).length > 2 ? 'syncopation' : 'backbeat'} of the snare. Ensure your transient shaping emphasizes steps {activePattern.snare.indexOf(true) + 1} and {activePattern.snare.lastIndexOf(true) + 1} for maximum impact.
             </p>
           </div>

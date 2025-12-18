@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface SaturationSettings {
   type: string;
@@ -37,6 +39,25 @@ const HarmonicConsultant: React.FC<HarmonicConsultantProps> = ({ activeDAW, sele
   const [activeTarget, setActiveTarget] = useState<SaturationTarget>(SAT_TARGETS[0]);
   const [settings, setSettings] = useState<SaturationSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!settings) return;
+    const title = `Harmonic Profile: ${activeTarget.name} - ${selectedGenre?.sub}`;
+    const filename = `harmonic_${activeTarget.id}_${Date.now()}`;
+
+    if (format === 'pdf' || format === 'docx') {
+      const sections = [
+        { heading: 'Processing Type', content: settings.type },
+        { heading: 'Harmonic Content', content: settings.harmonics },
+        { heading: 'Parameters', content: `Drive: ${settings.drive}\nMix: ${settings.mix}\nTone: ${settings.tone}\nOversampling: ${settings.oversampling}` },
+        { heading: 'Technical Logic', content: settings.logic }
+      ];
+      if (format === 'pdf') await exportToPDF(title, sections, filename);
+      else await exportToDocx(title, sections, filename);
+    } else {
+      await exportToImage('harmonic-rack-container', format, filename);
+    }
+  };
 
   const consultHarmonics = async (target: SaturationTarget) => {
     if (!selectedGenre) return;
@@ -132,7 +153,10 @@ const HarmonicConsultant: React.FC<HarmonicConsultantProps> = ({ activeDAW, sele
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
         {/* Saturation Rack */}
-        <div className="lg:col-span-8 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col relative overflow-hidden">
+        <div id="harmonic-rack-container" className="lg:col-span-8 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col relative overflow-hidden">
+          <div className="absolute top-8 right-8 z-50">
+            {settings && <ExportMenu onExport={handleExport} />}
+          </div>
           <div className="absolute top-0 right-0 p-8 opacity-5">
             <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-orange-500"><path d="M12 2c1.2 0 2.4.4 3.4 1.2.6.4 1.2.9 1.7 1.5.5.6.9 1.2 1.2 1.9.3.7.5 1.4.5 2.2 0 .8-.2 1.5-.5 2.2-.3.7-.7 1.3-1.2 1.9s-1.1 1.1-1.7 1.5c-1 .8-2.2 1.2-3.4 1.2s-2.4-.4-3.4-1.2c-.6-.4-1.2-.9-1.7-1.5-.5-.6-.9-1.2-1.2-1.9-.3-.7-.5-1.4-.5-2.2 0-.8.2-1.5.5-2.2.3-.7.7-1.3 1.2-1.9s1.1-1.1 1.7-1.5c1-.8 2.2-1.2 3.4-1.2Z"/><path d="M12 14v8"/><path d="M8 18h8"/></svg>
           </div>
@@ -144,7 +168,7 @@ const HarmonicConsultant: React.FC<HarmonicConsultantProps> = ({ activeDAW, sele
                 {activeTarget.icon} {activeTarget.name} Exciter
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-right pr-20">
                <span className="text-[10px] text-zinc-500 font-bold uppercase">Harmonic Density</span>
                <div className="h-1.5 w-32 bg-zinc-800 rounded-full mt-2 overflow-hidden border border-zinc-700">
                   <div className="h-full bg-gradient-to-r from-orange-600 to-yellow-500 w-3/4 animate-pulse"></div>

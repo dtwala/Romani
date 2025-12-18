@@ -14,7 +14,8 @@ export enum ToolType {
   INSTRUMENT_DATABASE = 'INSTRUMENT_DATABASE',
   VOCAL_BOOTH = 'VOCAL_BOOTH',
   PLUGIN_ADVISOR = 'PLUGIN_ADVISOR',
-  STUDIO_SETUP = 'STUDIO_SETUP'
+  STUDIO_SETUP = 'STUDIO_SETUP',
+  SAMPLE_LAB = 'SAMPLE_LAB'
 }
 
 export enum DAWType {
@@ -64,7 +65,13 @@ export interface InstrumentSpec {
   roleInGenre: string;
   eqSweetSpots: { range: string; effect: string }[];
   problemRanges: { range: string; effect: string }[];
-  compression: { ratio: string; attack: string; release: string; notes: string };
+  compression: { 
+    ratio: string; 
+    attack: string; 
+    release: string; 
+    notes: string;
+    impact: string; // Detail how these settings affect genre presence
+  };
   stereoField: {
     panning: string;
     width: string;

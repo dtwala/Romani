@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface CompressionSettings {
   threshold: string;
@@ -40,6 +42,24 @@ const DynamicsConsultant: React.FC<DynamicsConsultantProps> = ({ activeDAW, sele
   const [activeInstrument, setActiveInstrument] = useState<Instrument>(INSTRUMENTS[0]);
   const [settings, setSettings] = useState<CompressionSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!settings) return;
+    const title = `Dynamics Protocol: ${activeInstrument.name} - ${selectedGenre?.sub}`;
+    const filename = `dynamics_${activeInstrument.id}_${Date.now()}`;
+
+    if (format === 'pdf' || format === 'docx') {
+      const sections = [
+        { heading: 'Target Gain Reduction', content: settings.targetGainReduction },
+        { heading: 'Parameters', content: `Threshold: ${settings.threshold}\nRatio: ${settings.ratio}\nAttack: ${settings.attack}\nRelease: ${settings.release}\nKnee: ${settings.knee}\nMakeup: ${settings.makeupGain}` },
+        { heading: 'Technical Logic', content: settings.logic }
+      ];
+      if (format === 'pdf') await exportToPDF(title, sections, filename);
+      else await exportToDocx(title, sections, filename);
+    } else {
+      await exportToImage('dynamics-rack-container', format, filename);
+    }
+  };
 
   const consultDynamics = async (instrument: Instrument) => {
     if (!selectedGenre) return;
@@ -138,7 +158,10 @@ const DynamicsConsultant: React.FC<DynamicsConsultantProps> = ({ activeDAW, sele
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
         {/* Rack Display */}
-        <div className="lg:col-span-8 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col">
+        <div id="dynamics-rack-container" className="lg:col-span-8 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col relative">
+          <div className="absolute top-8 right-8">
+            {settings && <ExportMenu onExport={handleExport} />}
+          </div>
           <header className="flex justify-between items-start mb-10">
             <div>
               <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">{activeDAW} Dynamics Engine</h3>
@@ -146,7 +169,7 @@ const DynamicsConsultant: React.FC<DynamicsConsultantProps> = ({ activeDAW, sele
                 {activeInstrument.icon} {activeInstrument.name} Protocol
               </p>
             </div>
-            <div className="flex flex-col items-end">
+            <div className="flex flex-col items-end pr-16">
                <span className="text-[10px] text-zinc-500 font-bold uppercase">Optimal Gain Stage</span>
                <div className="flex gap-0.5 mt-1">
                   {[...Array(12)].map((_, i) => (
@@ -201,7 +224,7 @@ const DynamicsConsultant: React.FC<DynamicsConsultantProps> = ({ activeDAW, sele
 
         {/* Engineering Insight */}
         <div className="lg:col-span-4 space-y-6 flex flex-col">
-          <div className="flex-1 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md overflow-y-auto custom-scrollbar">
+          <div className="flex-1 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md overflow-y-auto custom-scrollbar flex flex-col">
             <h4 className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-4 flex items-center gap-2">
               <span className="w-6 h-px bg-purple-500/30"></span>
               {activeDAW} Logic

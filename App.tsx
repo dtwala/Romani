@@ -15,6 +15,7 @@ import InstrumentDatabase from './components/InstrumentDatabase';
 import VocalBooth from './components/VocalBooth';
 import PluginAdvisor from './components/PluginAdvisor';
 import StudioSetup from './components/StudioSetup';
+import SampleLab from './components/SampleLab';
 import { ToolType, SelectedGenre, DAWType } from './types';
 import { INSTRUMENT_CATEGORIES } from './data/instruments';
 import { DAW_PROFILES } from './data/daws';
@@ -41,7 +42,10 @@ const App: React.FC = () => {
 
   const handleInstrumentSelect = (instrument: string) => {
     setSelectedInstrument(instrument);
-    setActiveTab(ToolType.INSTRUMENT_DATABASE);
+    // If we're on Analyzer, stay there. Otherwise, switch to Specs.
+    if (activeTab !== ToolType.ANALYZER) {
+      setActiveTab(ToolType.INSTRUMENT_DATABASE);
+    }
   };
 
   return (
@@ -75,17 +79,13 @@ const App: React.FC = () => {
               <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 1L5 5L9 1" stroke="#52525B" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </div>
           </div>
-          <div className="mt-1.5 px-1 flex items-center gap-2">
-             <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"></div>
-             <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-tight">AI Engine Calibrated for {activeDAW}</span>
-          </div>
         </div>
 
         {/* Global Instrument Database Dropdown */}
         <div className="px-2">
           <label className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mb-2 block">Global Instrument Lab</label>
           <select 
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-zinc-300 focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2.5 text-xs text-zinc-300 focus:outline-none focus:border-blue-500 transition-all appearance-none cursor-pointer shadow-inner"
             onChange={(e) => handleInstrumentSelect(e.target.value)}
             value={selectedInstrument || ""}
           >
@@ -103,10 +103,11 @@ const App: React.FC = () => {
         <nav className="flex flex-col gap-1 overflow-y-auto custom-scrollbar pr-1 flex-1">
           <NavItem type={ToolType.LIVE_ASSISTANT} icon="🎙️" label="Live Studio" />
           <NavItem type={ToolType.ENGINEERING_CHAT} icon="🧠" label="Assistant Chat" />
-          <NavItem type={ToolType.STUDIO_SETUP} icon="📐" label="Technical Manual" />
+          <NavItem type={ToolType.SAMPLE_LAB} icon="💿" label="Sample Lab" />
           <NavItem type={ToolType.VOCAL_BOOTH} icon="🎤" label="Vocal Booth" />
           <NavItem type={ToolType.PLUGIN_ADVISOR} icon="🔌" label="Plugin Advisor" />
           <NavItem type={ToolType.INSTRUMENT_DATABASE} icon="🗂️" label="Instrument Specs" />
+          <NavItem type={ToolType.ANALYZER} icon="📊" label="Spectrum Lab" />
           <div className="my-2 border-t border-zinc-800/50"></div>
           <NavItem type={ToolType.SPATIAL_CONSULTANT} icon="🌊" label="Spatial Lab" />
           <NavItem type={ToolType.HARMONIC_CONSULTANT} icon="🔥" label="Harmonic Lab" />
@@ -116,7 +117,6 @@ const App: React.FC = () => {
           <NavItem type={ToolType.PATTERN_LAB} icon="🧪" label="Pattern Lab" />
           <NavItem type={ToolType.PRESETS} icon="📂" label="Preset Library" />
           <NavItem type={ToolType.CALCULATOR} icon="🎛️" label="Engineering Tools" />
-          <NavItem type={ToolType.ANALYZER} icon="📊" label="Spectrum Lab" />
         </nav>
 
         <div className="mt-auto p-4 bg-zinc-900/50 rounded-xl border border-zinc-800">
@@ -137,7 +137,7 @@ const App: React.FC = () => {
                 {activeTab === ToolType.LIVE_ASSISTANT && "Voice Studio Control"}
                 {activeTab === ToolType.ENGINEERING_CHAT && "Production Assistant"}
                 {activeTab === ToolType.CALCULATOR && "Precision Engineering"}
-                {activeTab === ToolType.ANALYZER && "Spectral Analysis"}
+                {activeTab === ToolType.ANALYZER && "Spectral Analysis Lab"}
                 {activeTab === ToolType.PRESETS && "Preset Library"}
                 {activeTab === ToolType.MASTERCLASS && "Production Masterclass"}
                 {activeTab === ToolType.PATTERN_LAB && "Pattern & Progression Lab"}
@@ -149,41 +149,25 @@ const App: React.FC = () => {
                 {activeTab === ToolType.VOCAL_BOOTH && "Vocal Booth Control"}
                 {activeTab === ToolType.PLUGIN_ADVISOR && "Studio Plugin Advisor"}
                 {activeTab === ToolType.STUDIO_SETUP && "Technical Environment Manual"}
+                {activeTab === ToolType.SAMPLE_LAB && "Sonic Sample Laboratory"}
               </h2>
               <p className="text-zinc-500 text-sm">
                 {activeTab === ToolType.LIVE_ASSISTANT && "Hands-free real-time technical guidance."}
+                {activeTab === ToolType.ANALYZER && `Analyzing spectral profile for ${selectedInstrument || 'Global Stream'}.`}
+                {activeTab === ToolType.SAMPLE_LAB && "Deep-dive sampling techniques and genre-specific crate-digging strategies."}
+                {/* ... other tool descriptions ... */}
                 {activeTab === ToolType.ENGINEERING_CHAT && "In-depth mixing, mastering, and sound design lessons."}
-                {activeTab === ToolType.CALCULATOR && "Calculate precise delay, reverb, and frequency parameters."}
-                {activeTab === ToolType.ANALYZER && "Monitor your signal path in high resolution."}
-                {activeTab === ToolType.PRESETS && "Store and recall genre-specific starting points for EQ and dynamics."}
-                {activeTab === ToolType.MASTERCLASS && "Deep-dive tutorials tailored to your specific genre and sub-genre."}
-                {activeTab === ToolType.PATTERN_LAB && "Analyze and experiment with genre-defining rhythms and chord structures."}
-                {activeTab === ToolType.SIGNAL_FLOW && "Logical processing chains for instruments and master buses."}
-                {activeTab === ToolType.DYNAMICS_CONSULTANT && "Expert surgical compression and transient shaping guidance."}
-                {activeTab === ToolType.HARMONIC_CONSULTANT && "Specialized saturation, grit, and analog warmth guidance."}
-                {activeTab === ToolType.SPATIAL_CONSULTANT && "Advanced reverb, delay, and stereo field architecture."}
-                {activeTab === ToolType.INSTRUMENT_DATABASE && `Surgical technical analysis for ${selectedInstrument || 'any studio source'}.`}
-                {activeTab === ToolType.VOCAL_BOOTH && "End-to-end guidance from tracking to final mix."}
-                {activeTab === ToolType.PLUGIN_ADVISOR && "Identify industry-standard VSTs for any instrument or sonic goal."}
-                {activeTab === ToolType.STUDIO_SETUP && `Deep-dive technical specifications and settings for ${activeDAW}.`}
               </p>
             </div>
             <div className="flex gap-4 items-end">
               {selectedGenre && (
                 <div className="flex flex-col items-end">
                     <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Active Profile</div>
-                    <div className="px-3 py-1 bg-blue-900/30 border border-blue-500/30 rounded-full text-blue-400 text-xs font-bold">
+                    <div className="px-3 py-1 bg-blue-900/30 border border-blue-500/30 rounded-full text-blue-400 text-xs font-bold uppercase">
                       {selectedGenre.sub}
                     </div>
                 </div>
               )}
-              <div className="flex flex-col items-end">
-                  <div className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">Active DAW</div>
-                  <div className="px-3 py-1 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-300 text-xs font-bold flex items-center gap-1.5">
-                    <span>{DAW_PROFILES[activeDAW].icon}</span>
-                    <span>{activeDAW}</span>
-                  </div>
-              </div>
             </div>
           </header>
 
@@ -201,28 +185,12 @@ const App: React.FC = () => {
             {activeTab === ToolType.INSTRUMENT_DATABASE && <InstrumentDatabase activeDAW={activeDAW} instrumentName={selectedInstrument} genre={selectedGenre} />}
             {activeTab === ToolType.VOCAL_BOOTH && <VocalBooth activeDAW={activeDAW} genre={selectedGenre} />}
             {activeTab === ToolType.PLUGIN_ADVISOR && <PluginAdvisor activeDAW={activeDAW} selectedGenre={selectedGenre} />}
-            {activeTab === ToolType.CALCULATOR && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <EngineeringCalculators />
-                <div className="bg-zinc-900/30 p-8 rounded-2xl border border-dashed border-zinc-800 flex flex-col items-center justify-center text-center">
-                  <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
-                    <span className="text-2xl">⚡</span>
-                  </div>
-                  <h3 className="text-zinc-300 font-semibold mb-2">More Tools Incoming</h3>
-                  <p className="text-zinc-500 text-sm max-w-[200px]">Phase alignment and Fletcher-Munson compensation modules are in development.</p>
-                </div>
-              </div>
-            )}
-            {activeTab === ToolType.ANALYZER && <AudioAnalyzer selectedGenre={selectedGenre} />}
+            {activeTab === ToolType.SAMPLE_LAB && <SampleLab selectedGenre={selectedGenre} activeDAW={activeDAW} />}
+            {activeTab === ToolType.CALCULATOR && <EngineeringCalculators />}
+            {activeTab === ToolType.ANALYZER && <AudioAnalyzer selectedGenre={selectedGenre} instrumentName={selectedInstrument} />}
           </div>
         </div>
       </main>
-      <style dangerouslySetInnerHTML={{ __html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #3f3f46; }
-      `}} />
     </div>
   );
 };

@@ -2,6 +2,8 @@
 import React from 'react';
 import { DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx } from '../utils/exportUtils';
 
 interface StudioSetupProps {
   activeDAW: DAWType;
@@ -9,6 +11,21 @@ interface StudioSetupProps {
 
 const StudioSetup: React.FC<StudioSetupProps> = ({ activeDAW }) => {
   const profile = DAW_PROFILES[activeDAW];
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    const title = `Studio Environment: ${activeDAW}`;
+    const sections = [
+      { heading: 'Workflow Focus', content: profile.workflowFocus },
+      { heading: 'Core Stock Toolkit', content: profile.stockPlugins.join(', ') },
+      { heading: 'Recommended Audio Settings', content: profile.recommendedSettings.map(s => `${s.name}: ${s.value}\n${s.description}`).join('\n\n') },
+      { heading: 'Essential Shortcuts', content: profile.shortcuts.map(s => `${s.action} -> ${s.key}`).join('\n') },
+      { heading: 'Mixing Philosophy', content: profile.mixingPhilosophy },
+      { heading: 'Mastering Logic', content: profile.masteringWorkflow }
+    ];
+    if (format === 'pdf') await exportToPDF(title, sections, `studio_${activeDAW.toLowerCase().replace(' ', '_')}`);
+    else if (format === 'docx') await exportToDocx(title, sections, `studio_${activeDAW.toLowerCase().replace(' ', '_')}`);
+    else alert("Feature coming soon.");
+  };
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8 overflow-y-auto custom-scrollbar pr-2">
@@ -19,8 +36,13 @@ const StudioSetup: React.FC<StudioSetupProps> = ({ activeDAW }) => {
         </div>
         
         <header className="relative z-10 max-w-2xl">
-          <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Engineering Technical Manual</h3>
-          <h2 className="text-4xl font-black text-white mb-4">{activeDAW} Environment</h2>
+          <div className="flex justify-between items-start mb-4">
+             <div>
+                <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">Engineering Technical Manual</h3>
+                <h2 className="text-4xl font-black text-white mb-4">{activeDAW} Environment</h2>
+             </div>
+             <ExportMenu onExport={handleExport} />
+          </div>
           <p className="text-zinc-400 text-sm leading-relaxed">
             {profile.workflowFocus} This profile is specifically calibrated for surgical engineering, high-fidelity tracking, and professional mastering within the {activeDAW} ecosystem.
           </p>

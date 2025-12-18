@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx } from '../utils/exportUtils';
 
 interface ProcessingUnit {
   id: string;
@@ -36,6 +38,18 @@ const SignalFlowArchitect: React.FC<SignalFlowArchitectProps> = ({ activeDAW, se
   const [chain, setChain] = useState<ProcessingUnit[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedUnit, setSelectedUnit] = useState<ProcessingUnit | null>(null);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (chain.length === 0) return;
+    const title = `Signal Flow Report: ${activeTarget.name} - ${selectedGenre?.sub}`;
+    const sections = chain.map((unit, idx) => ({
+      heading: `${idx + 1}. ${unit.name} (${unit.type})`,
+      content: `Settings: ${unit.settings}\nArchitecture Logic: ${unit.logic}`
+    }));
+    if (format === 'pdf') await exportToPDF(title, sections, 'signal_flow_report');
+    else if (format === 'docx') await exportToDocx(title, sections, 'signal_flow_report');
+    else alert("Rack image export developing.");
+  };
 
   const generateChain = async (target: ProcessingTarget) => {
     if (!selectedGenre) return;
@@ -123,8 +137,11 @@ const SignalFlowArchitect: React.FC<SignalFlowArchitectProps> = ({ activeDAW, se
             </button>
           ))}
         </div>
-        <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest bg-zinc-900/50 px-3 py-2 rounded-lg border border-zinc-800">
-           Engine: {activeDAW} Signal Logic
+        <div className="flex items-center gap-4">
+          <ExportMenu onExport={handleExport} />
+          <div className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest bg-zinc-900/50 px-3 py-2 rounded-lg border border-zinc-800">
+             Engine: {activeDAW} Signal Logic
+          </div>
         </div>
       </div>
 

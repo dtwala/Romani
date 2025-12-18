@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface SpatialSettings {
   reverbType: string;
@@ -38,6 +40,26 @@ const SpatialConsultant: React.FC<SpatialConsultantProps> = ({ activeDAW, select
   const [activeTarget, setActiveTarget] = useState<SpatialTarget>(SPATIAL_TARGETS[0]);
   const [settings, setSettings] = useState<SpatialSettings | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!settings) return;
+    const title = `Spatial Map: ${activeTarget.name} - ${selectedGenre?.sub}`;
+    const filename = `spatial_${activeTarget.id}_${Date.now()}`;
+
+    if (format === 'pdf' || format === 'docx') {
+      const sections = [
+        { heading: 'Acoustic Space', content: settings.reverbType },
+        { heading: 'Temporal Parameters', content: `Decay: ${settings.decayTime}\nPre-Delay: ${settings.preDelay}\nMix: ${settings.reverbMix}` },
+        { heading: 'Echo & Rhythmic Architecture', content: `Delay: ${settings.delayType}\nFeedback: ${settings.delayFeedback}` },
+        { heading: 'Stereo Field Target', content: settings.stereoWidth },
+        { heading: 'Atmospheric Logic', content: settings.logic }
+      ];
+      if (format === 'pdf') await exportToPDF(title, sections, filename);
+      else await exportToDocx(title, sections, filename);
+    } else {
+      await exportToImage('spatial-rack-container', format, filename);
+    }
+  };
 
   const consultSpatial = async (target: SpatialTarget) => {
     if (!selectedGenre) return;
@@ -135,7 +157,10 @@ const SpatialConsultant: React.FC<SpatialConsultantProps> = ({ activeDAW, select
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
         {/* Spatial Processor Rack */}
-        <div className="lg:col-span-8 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col relative overflow-hidden">
+        <div id="spatial-rack-container" className="lg:col-span-8 bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md flex flex-col relative overflow-hidden">
+          <div className="absolute top-8 right-8 z-50">
+            {settings && <ExportMenu onExport={handleExport} />}
+          </div>
           <div className="absolute -bottom-10 -left-10 opacity-5 pointer-events-none">
              <svg width="400" height="400" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="100" cy="100" r="80" fill="none" stroke="currentColor" strokeWidth="2" className="text-purple-500" strokeDasharray="4 4"/>
@@ -150,7 +175,7 @@ const SpatialConsultant: React.FC<SpatialConsultantProps> = ({ activeDAW, select
                 {activeTarget.icon} {activeTarget.name} Environment
               </p>
             </div>
-            <div className="text-right">
+            <div className="text-right pr-20">
                <span className="text-[10px] text-zinc-500 font-bold uppercase">DAW: {activeDAW}</span>
                <div className="flex gap-1 mt-2">
                   {[...Array(10)].map((_, i) => (

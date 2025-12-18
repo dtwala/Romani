@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx } from '../utils/exportUtils';
 
 interface MasterclassTopic {
   id: string;
@@ -36,6 +38,24 @@ const ProductionMasterclass: React.FC<ProductionMasterclassProps> = ({ activeDAW
   const [selectedTopic, setSelectedTopic] = useState<MasterclassTopic | null>(null);
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!content || !selectedTopic || !selectedGenre) return;
+    const title = `Masterclass: ${selectedTopic.name} - ${selectedGenre.sub}`;
+    const filename = `masterclass_${selectedTopic.id}_${selectedGenre.sub.toLowerCase()}`;
+    
+    // Split content into reasonable sections for PDF/Docx formatting
+    const sections = content.split('\n\n').map(p => {
+      const lines = p.split('\n');
+      const heading = lines[0].replace(/#/g, '').trim();
+      const text = lines.slice(1).join('\n').trim();
+      return { heading: heading || 'Technical Note', content: text || lines[0] };
+    });
+
+    if (format === 'pdf') await exportToPDF(title, sections, filename);
+    else if (format === 'docx') await exportToDocx(title, sections, filename);
+    else alert("Visual snapshot not supported for long tutorials. Use PDF.");
+  };
 
   const startTopic = async (topic: MasterclassTopic) => {
     if (!selectedGenre) return;
@@ -150,8 +170,11 @@ const ProductionMasterclass: React.FC<ProductionMasterclassProps> = ({ activeDAW
                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Studio: {activeDAW} | Genre: {selectedGenre.sub}</p>
               </div>
             </div>
-            <div className="px-3 py-1 bg-zinc-800 rounded-full text-[10px] font-bold text-zinc-400 border border-zinc-700">
-              {activeDAW.toUpperCase()} MODULE
+            <div className="flex items-center gap-3">
+              <ExportMenu onExport={handleExport} />
+              <div className="px-3 py-1 bg-zinc-800 rounded-full text-[10px] font-bold text-zinc-400 border border-zinc-700">
+                {activeDAW.toUpperCase()} MODULE
+              </div>
             </div>
           </header>
 

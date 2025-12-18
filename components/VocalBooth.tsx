@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx } from '../utils/exportUtils';
 
 interface VocalBoothSpecs {
   recording: {
@@ -30,6 +32,30 @@ const VocalBooth: React.FC<VocalBoothProps> = ({ activeDAW, genre }) => {
   const [specs, setSpecs] = useState<VocalBoothSpecs | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'tracking' | 'mixing'>('tracking');
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!specs || !genre) return;
+    const title = `Vocal Strategy: ${genre.sub} - ${activeDAW}`;
+    const filename = `vocal_spec_${genre.sub.toLowerCase()}`;
+    
+    const sections = activeTab === 'tracking' ? [
+      { heading: 'Microphone & Hardware', content: specs.recording.micType },
+      { heading: 'Physical Placement', content: specs.recording.placement },
+      { heading: 'Preamp Calibration', content: specs.recording.preampSettings },
+      { heading: 'Input Processing', content: specs.recording.trackingCompression },
+      { heading: 'Engineering Philosophy', content: specs.genreLogic }
+    ] : [
+      { heading: 'Surgical Treatment', content: `De-Esser: ${specs.processing.deEsserFreq}\nEQ: ${specs.processing.surgicalEQ}` },
+      { heading: 'Dynamics Chain', content: specs.processing.compressionChain },
+      { heading: 'Tonal Enhancement', content: specs.processing.tonalShaping },
+      { heading: 'Spatial Mapping', content: specs.processing.spatialArchitecture },
+      { heading: 'Engineering Philosophy', content: specs.genreLogic }
+    ];
+
+    if (format === 'pdf') await exportToPDF(title, sections, filename);
+    else if (format === 'docx') await exportToDocx(title, sections, filename);
+    else alert("Visual snapshot for this module is coming soon.");
+  };
 
   const fetchVocalSpecs = async () => {
     if (!genre) return;
@@ -102,28 +128,33 @@ const VocalBooth: React.FC<VocalBoothProps> = ({ activeDAW, genre }) => {
 
   return (
     <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 overflow-hidden pb-8">
-      {/* Stage Selector */}
-      <div className="flex gap-4 p-1 bg-zinc-950/60 rounded-2xl border border-zinc-800 w-fit">
-        <button
-          onClick={() => setActiveTab('tracking')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeTab === 'tracking'
-              ? 'bg-pink-600 text-white shadow-lg shadow-pink-900/20'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <span>🎙️</span> Recording Phase
-        </button>
-        <button
-          onClick={() => setActiveTab('mixing')}
-          className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
-            activeTab === 'mixing'
-              ? 'bg-pink-600 text-white shadow-lg shadow-pink-900/20'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <span>🎚️</span> Mixing Phase
-        </button>
+      <div className="flex justify-between items-center">
+        {/* Stage Selector */}
+        <div className="flex gap-4 p-1 bg-zinc-950/60 rounded-2xl border border-zinc-800 w-fit">
+          <button
+            onClick={() => setActiveTab('tracking')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'tracking'
+                ? 'bg-pink-600 text-white shadow-lg shadow-pink-900/20'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <span>🎙️</span> Recording Phase
+          </button>
+          <button
+            onClick={() => setActiveTab('mixing')}
+            className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'mixing'
+                ? 'bg-pink-600 text-white shadow-lg shadow-pink-900/20'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            <span>🎚️</span> Mixing Phase
+          </button>
+        </div>
+        <div className="flex items-center gap-4">
+           {specs && <ExportMenu onExport={handleExport} />}
+        </div>
       </div>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">

@@ -4,6 +4,8 @@ import { GoogleGenAI } from '@google/genai';
 import { TranscriptionMessage, SelectedGenre, DAWType } from '../types';
 import { GENRE_DATABASE } from '../data/genres';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface AssistantChatProps {
   activeDAW: DAWType;
@@ -21,12 +23,29 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ activeDAW, selectedGenre,
   const [showGenreHub, setShowGenreHub] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    const title = `Production Session - ${selectedGenre?.sub || 'General'} - ${activeDAW}`;
+    const filename = `session_${selectedGenre?.sub.toLowerCase() || 'general'}_${Date.now()}`;
+    
+    if (format === 'pdf' || format === 'docx') {
+      const sections = messages.map((m) => ({
+        heading: m.role === 'user' ? 'ENGINEER' : 'SONIC AI',
+        content: m.text
+      }));
+      if (format === 'pdf') await exportToPDF(title, sections, filename);
+      else await exportToDocx(title, sections, filename);
+    } else {
+      await exportToImage('chat-messages-area', format, filename);
+    }
+  };
 
   const filteredGenres = GENRE_DATABASE.map(cat => ({
     ...cat,
@@ -120,12 +139,15 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ activeDAW, selectedGenre,
             </p>
           </div>
         </div>
-        <button 
-          onClick={() => setShowGenreHub(!showGenreHub)}
-          className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-xs font-bold text-zinc-300 transition-all border border-zinc-700"
-        >
-          {showGenreHub ? 'Close Hub' : 'Browse Genres'}
-        </button>
+        <div className="flex gap-2">
+          <ExportMenu onExport={handleExport} />
+          <button 
+            onClick={() => setShowGenreHub(!showGenreHub)}
+            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs font-bold text-zinc-300 transition-all border border-zinc-700"
+          >
+            {showGenreHub ? 'Close Hub' : 'Browse Genres'}
+          </button>
+        </div>
       </div>
 
       {/* Genre Search Overlay */}
@@ -165,7 +187,11 @@ const AssistantChat: React.FC<AssistantChatProps> = ({ activeDAW, selectedGenre,
       )}
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4" ref={scrollRef}>
+      <div 
+        id="chat-messages-area"
+        className="flex-1 overflow-y-auto p-6 space-y-4 bg-zinc-950/20" 
+        ref={scrollRef}
+      >
         {messages.map((msg, idx) => (
           <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[85%] rounded-2xl p-4 ${

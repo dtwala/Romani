@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { Preset } from '../types';
 import { GENRE_DATABASE } from '../data/genres';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx } from '../utils/exportUtils';
 
 const INITIAL_PRESETS: Preset[] = [
   {
@@ -55,12 +57,27 @@ const PresetsManager: React.FC = () => {
     name: '', genre: 'Deep House', type: 'Mixing', params: { eq: '', compression: '', reverb: '', special: '' }, notes: ''
   });
 
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!selectedPreset) return;
+    const title = `Preset: ${selectedPreset.name} (${selectedPreset.type})`;
+    const sections = [
+      { heading: 'Genre Context', content: selectedPreset.genre },
+      { heading: 'Spectral Settings', content: selectedPreset.params.eq },
+      { heading: 'Dynamics Architecture', content: selectedPreset.params.compression },
+      { heading: 'Spatial Atmosphere', content: selectedPreset.params.reverb },
+      { heading: 'Advanced Processing', content: selectedPreset.params.special },
+      { heading: 'Engineering Philosophy', content: selectedPreset.notes }
+    ];
+    if (format === 'pdf') await exportToPDF(title, sections, `preset_${selectedPreset.id}`);
+    else if (format === 'docx') await exportToDocx(title, sections, `preset_${selectedPreset.id}`);
+    else alert("Snapshots coming soon.");
+  };
+
   useEffect(() => {
     const saved = localStorage.getItem('sonic_presets');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Merge with initial presets ensuring no duplicates by ID
         const initialIds = new Set(INITIAL_PRESETS.map(p => p.id));
         const custom = parsed.filter((p: Preset) => !initialIds.has(p.id));
         setPresets([...INITIAL_PRESETS, ...custom]);
@@ -313,11 +330,14 @@ const PresetsManager: React.FC = () => {
                     <span className="px-3 py-1 bg-purple-900/30 text-purple-400 text-[10px] rounded-full uppercase font-black border border-purple-500/20 tracking-widest">{selectedPreset.type}</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-1">Status</div>
-                  <div className="px-3 py-1 bg-emerald-900/20 border border-emerald-500/20 rounded-lg text-emerald-400 flex items-center gap-1.5 text-[10px] font-black uppercase">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div> Active Profile
-                  </div>
+                <div className="flex gap-4 items-start">
+                   <ExportMenu onExport={handleExport} />
+                   <div className="text-right">
+                     <div className="text-[10px] text-zinc-500 uppercase tracking-widest font-black mb-1">Status</div>
+                     <div className="px-3 py-1 bg-emerald-900/20 border border-emerald-500/20 rounded-lg text-emerald-400 flex items-center gap-1.5 text-[10px] font-black uppercase">
+                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div> Active Profile
+                     </div>
+                   </div>
                 </div>
               </div>
             </div>

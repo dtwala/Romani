@@ -1,6 +1,9 @@
 
 import React, { useEffect, useRef, useState } from 'react';
-import { SelectedGenre } from '../types';
+import { SelectedGenre, DAWType } from '../types';
+import { GoogleGenAI } from '@google/genai';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface FrequencyBand {
   label: string;
@@ -19,176 +22,105 @@ interface InstrumentProfile {
   bands: FrequencyBand[];
 }
 
-interface GenreAnalysisConfig {
-  fftSize: number;
-  smoothing: number;
-  primaryColor: string;
-  focusRange: [number, number];
-  focusLabel: string;
+interface ComparisonResult {
+  tonalBalance: string;
+  dynamicsCompare: string;
+  stereoDepth: string;
+  correctionBlueprint: string[];
 }
 
-const GENRE_ANALYSIS_MAP: Record<string, GenreAnalysisConfig> = {
-  "Hip-hop": { fftSize: 1024, smoothing: 0.85, primaryColor: '#3b82f6', focusRange: [30, 100], focusLabel: 'SUB ENGINE' },
-  "Electronic": { fftSize: 512, smoothing: 0.8, primaryColor: '#06b6d4', focusRange: [100, 300], focusLabel: 'TRANS PUNCH' },
-  "Rock": { fftSize: 512, smoothing: 0.8, primaryColor: '#f97316', focusRange: [2000, 5000], focusLabel: 'GUITAR EDGE' },
-  "Jazz": { fftSize: 2048, smoothing: 0.92, primaryColor: '#eab308', focusRange: [8000, 16000], focusLabel: 'SPECTRAL AIR' },
-  "Pop": { fftSize: 512, smoothing: 0.88, primaryColor: '#ec4899', focusRange: [3000, 7000], focusLabel: 'VOCAL FOCUS' },
-  "African": { fftSize: 1024, smoothing: 0.85, primaryColor: '#10b981', focusRange: [400, 1200], focusLabel: 'PERC RESONANCE' },
-  "Reggae": { fftSize: 1024, smoothing: 0.9, primaryColor: '#facc15', focusRange: [40, 120], focusLabel: 'BASS FOUNDATION' },
-  "Metal": { fftSize: 512, smoothing: 0.75, primaryColor: '#ef4444', focusRange: [3000, 6000], focusLabel: 'MID CUT' }
-};
-
-const INSTRUMENT_PROFILES: InstrumentProfile[] = [
-  {
-    name: 'Vocals',
-    icon: '🎤',
-    attack: 'Soft / Mid',
-    sustain: 'High',
-    genreUseCases: ['Pop', 'Jazz', 'Rock', 'R&B'],
-    bands: [
-      { label: 'Fundamental', min: 80, max: 200, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Mud', min: 250, max: 500, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Presence', min: 3000, max: 5000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-      { label: 'Air', min: 10000, max: 16000, color: 'rgba(139, 92, 246, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Kick Drum',
-    icon: '🥁',
-    attack: 'Very Fast / Punchy',
-    sustain: 'Low',
-    genreUseCases: ['Electronic', 'Hip-Hop', 'Metal'],
-    bands: [
-      { label: 'Sub/Weight', min: 50, max: 100, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Boxy', min: 300, max: 600, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Beater Click', min: 2000, max: 4000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Electric Bass',
-    icon: '🎸',
-    attack: 'Medium / Percussive',
-    sustain: 'Medium-High',
-    genreUseCases: ['Funk', 'Rock', 'Blues'],
-    bands: [
-      { label: 'Bottom', min: 40, max: 100, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Attack', min: 700, max: 1200, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-      { label: 'Finger Noise', min: 2000, max: 5000, color: 'rgba(139, 92, 246, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Snare',
-    icon: '🥁',
-    attack: 'Fast / Sharp',
-    sustain: 'Medium-Low',
-    genreUseCases: ['Rock', 'Pop', 'Country'],
-    bands: [
-      { label: 'Body', min: 150, max: 250, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Ring', min: 600, max: 900, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Snap/Crack', min: 2000, max: 5000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Guitars',
-    icon: '🎸',
-    attack: 'Medium',
-    sustain: 'Variable',
-    genreUseCases: ['Rock', 'Indie', 'Folk'],
-    bands: [
-      { label: 'Body', min: 200, max: 400, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Honk', min: 800, max: 1200, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Presence', min: 3000, max: 6000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Synth Lead',
-    icon: '🎹',
-    attack: 'Fast / Modulated',
-    sustain: 'Variable / High',
-    genreUseCases: ['EDM', 'Synthwave', 'Hip-Hop'],
-    bands: [
-      { label: 'Bite', min: 2000, max: 4000, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Harshness', min: 5000, max: 8000, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Fundamental', min: 200, max: 800, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Acoustic Piano',
-    icon: '🎹',
-    attack: 'Fast',
-    sustain: 'High',
-    genreUseCases: ['Classical', 'Jazz', 'Pop'],
-    bands: [
-      { label: 'Body', min: 150, max: 400, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Clutter', min: 300, max: 600, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Clarity', min: 2000, max: 5000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Drum Overheads',
-    icon: '✨',
-    attack: 'Fast',
-    sustain: 'Medium',
-    genreUseCases: ['Rock', 'Jazz', 'Metal'],
-    bands: [
-      { label: 'Sizzle', min: 6000, max: 12000, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Harshness', min: 3000, max: 5000, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Snare Body', min: 200, max: 500, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Cello',
-    icon: '🎻',
-    attack: 'Slow / Mid',
-    sustain: 'Very High',
-    genreUseCases: ['Classical', 'Cinematic', 'Folk'],
-    bands: [
-      { label: 'Warmth', min: 100, max: 300, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Boxy', min: 400, max: 800, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Bow Noise', min: 2000, max: 4000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  },
-  {
-    name: 'Trumpet',
-    icon: '🎺',
-    attack: 'Fast / Mid',
-    sustain: 'High',
-    genreUseCases: ['Jazz', 'Latin', 'Orchestral'],
-    bands: [
-      { label: 'Body', min: 400, max: 1000, color: 'rgba(59, 130, 246, 0.2)', type: 'sweet' },
-      { label: 'Piercing', min: 1500, max: 3000, color: 'rgba(239, 68, 68, 0.15)', type: 'problem' },
-      { label: 'Brilliance', min: 4000, max: 8000, color: 'rgba(16, 185, 129, 0.2)', type: 'sweet' },
-    ]
-  }
-];
-
-interface AudioAnalyzerProps {
-  selectedGenre: SelectedGenre | null;
-}
-
-const AudioAnalyzer: React.FC<AudioAnalyzerProps> = ({ selectedGenre }) => {
+const AudioAnalyzer: React.FC<{ selectedGenre: SelectedGenre | null; instrumentName: string | null }> = ({ selectedGenre, instrumentName }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isActive, setIsActive] = useState(false);
-  const [selectedProfile, setSelectedProfile] = useState<InstrumentProfile | null>(null);
+  const [activeProfile, setActiveProfile] = useState<InstrumentProfile | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [mode, setMode] = useState<'realtime' | 'reference'>('realtime');
+  
+  // Reference Mode States
+  const [mixFile, setMixFile] = useState<File | null>(null);
+  const [refFile, setRefFile] = useState<File | null>(null);
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
   const audioCtxRef = useRef<AudioContext | null>(null);
   const analyzerRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | undefined>(undefined);
 
-  // Dynamic analysis config based on genre
-  const genreConfig = (selectedGenre && GENRE_ANALYSIS_MAP[selectedGenre.cat]) || {
-    fftSize: 512,
-    smoothing: 0.8,
-    primaryColor: '#3b82f6',
-    focusRange: [200, 2000],
-    focusLabel: 'NEUTRAL PROFILE'
+  // Fix: Ensure format is narrowed down to 'png' | 'jpg' when calling exportToImage
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (mode === 'reference' && comparison) {
+      const sections = [
+        { heading: 'Tonal Balance Analysis', content: comparison.tonalBalance },
+        { heading: 'Dynamic Range Comparison', content: comparison.dynamicsCompare },
+        { heading: 'Stereo Depth Observation', content: comparison.stereoDepth },
+        { heading: 'Correction Blueprint', content: comparison.correctionBlueprint.join('\n- ') }
+      ];
+      if (format === 'pdf') {
+        await exportToPDF("Sonic Reference Analysis", sections, "reference_report");
+        return;
+      } else if (format === 'docx') {
+        await exportToDocx("Sonic Reference Analysis", sections, "reference_report");
+        return;
+      }
+    }
+    
+    // Narrow type for exportToImage which only supports 'png' | 'jpg'
+    if (format === 'png' || format === 'jpg') {
+      await exportToImage('analyzer-main-container', format, 'spectral_snapshot');
+    }
   };
 
-  useEffect(() => {
-    if (analyzerRef.current) {
-      analyzerRef.current.fftSize = genreConfig.fftSize;
-      analyzerRef.current.smoothingTimeConstant = genreConfig.smoothing;
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result?.toString().split(',')[1] || '');
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  const performComparison = async () => {
+    if (!mixFile || !refFile) return;
+    setIsAnalyzing(true);
+    setComparison(null);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const mixData = await fileToBase64(mixFile);
+      const refData = await fileToBase64(refFile);
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: [
+          {
+            parts: [
+              { text: "Act as a senior mastering engineer. Compare the following two audio files. The first is my 'Current Mix' and the second is the 'Pro Reference Track'. Analyze the differences in frequency balance, dynamic range, and stereo width. Then suggest specific EQ and compression tweaks to make my mix sound as professional as the reference." },
+              { inlineData: { data: mixData, mimeType: mixFile.type } },
+              { inlineData: { data: refData, mimeType: refFile.type } }
+            ]
+          }
+        ],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: "object",
+            properties: {
+              tonalBalance: { type: "string" },
+              dynamicsCompare: { type: "string" },
+              stereoDepth: { type: "string" },
+              correctionBlueprint: { type: "array", items: { type: "string" } }
+            }
+          }
+        }
+      });
+
+      setComparison(JSON.parse(response.text));
+    } catch (err) {
+      console.error("Comparison Error:", err);
+    } finally {
+      setIsAnalyzing(false);
     }
-  }, [genreConfig]);
+  };
 
   const startAnalysis = async () => {
     try {
@@ -197,14 +129,10 @@ const AudioAnalyzer: React.FC<AudioAnalyzerProps> = ({ selectedGenre }) => {
       analyzerRef.current = audioCtxRef.current.createAnalyser();
       const source = audioCtxRef.current.createMediaStreamSource(stream);
       source.connect(analyzerRef.current);
-      
-      analyzerRef.current.fftSize = genreConfig.fftSize;
-      analyzerRef.current.smoothingTimeConstant = genreConfig.smoothing;
-      
       setIsActive(true);
       draw();
     } catch (err) {
-      console.error("Microphone access denied", err);
+      console.error("Mic Error", err);
     }
   };
 
@@ -213,222 +141,136 @@ const AudioAnalyzer: React.FC<AudioAnalyzerProps> = ({ selectedGenre }) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    const nyquist = 44100 / 2;
-
-    const freqToX = (freq: number) => {
-      const logMin = Math.log10(20);
-      const logMax = Math.log10(20000);
-      const logFreq = Math.log10(Math.max(20, freq));
-      return ((logFreq - logMin) / (logMax - logMin)) * canvas.width;
-    };
-
     const renderFrame = () => {
       if (!analyzerRef.current) return;
       animationRef.current = requestAnimationFrame(renderFrame);
-      
       const bufferLength = analyzerRef.current.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       analyzerRef.current.getByteFrequencyData(dataArray);
-
       ctx.fillStyle = '#09090b';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // 1. Draw Genre Focus Overlay
-      if (selectedGenre) {
-        const [min, max] = genreConfig.focusRange;
-        const xStart = freqToX(min);
-        const xEnd = freqToX(max);
-        const width = xEnd - xStart;
-
-        ctx.fillStyle = `${genreConfig.primaryColor}05`; // Very subtle background
-        ctx.fillRect(xStart, 0, width, canvas.height);
-        
-        ctx.strokeStyle = `${genreConfig.primaryColor}20`;
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(xStart, 0, width, canvas.height);
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = genreConfig.primaryColor;
-        ctx.font = 'black 8px Inter';
-        ctx.fillText(`GENRE FOCUS: ${genreConfig.focusLabel}`, xStart + 4, canvas.height - 25);
-      }
-
-      // 2. Draw Instrument Profile Bands
-      if (selectedProfile) {
-        selectedProfile.bands.forEach(band => {
-          const xStart = freqToX(band.min);
-          const xEnd = freqToX(band.max);
-          const width = xEnd - xStart;
-
-          ctx.fillStyle = band.color;
-          ctx.fillRect(xStart, 0, width, canvas.height);
-
-          ctx.fillStyle = band.type === 'problem' ? '#ef4444' : '#60a5fa';
-          ctx.font = 'bold 9px Inter';
-          ctx.fillText(band.label.toUpperCase(), xStart + 2, 12);
-          
-          ctx.strokeStyle = band.color.replace('0.2', '0.4').replace('0.15', '0.3');
-          ctx.lineWidth = 1;
-          ctx.strokeRect(xStart, 0, width, canvas.height);
-        });
-      }
-
-      // 3. Draw Spectral Bars
-      const barWidth = 2;
+      const barWidth = (canvas.width / bufferLength) * 2.5;
+      let x = 0;
       for (let i = 0; i < bufferLength; i++) {
-        const freq = (i * nyquist) / bufferLength;
-        const x = freqToX(freq);
         const barHeight = (dataArray[i] / 255) * canvas.height;
-
-        // Gradient based on genre color
-        const baseColor = genreConfig.primaryColor;
-        ctx.fillStyle = `${baseColor}${Math.floor(Math.max(0.2, barHeight / canvas.height) * 255).toString(16).padStart(2, '0')}`;
+        ctx.fillStyle = `rgba(59, 130, 246, ${Math.max(0.2, dataArray[i]/255)})`;
         ctx.fillRect(x, canvas.height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
       }
-
-      // 4. Draw Frequency Labels
-      [100, 1000, 10000].forEach(f => {
-        const x = freqToX(f);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-        
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.font = '8px Monospace';
-        ctx.fillText(f >= 1000 ? `${f/1000}k` : f.toString(), x + 2, canvas.height - 5);
-      });
     };
     renderFrame();
   };
 
-  useEffect(() => {
-    return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-      if (audioCtxRef.current) audioCtxRef.current.close();
-    };
-  }, []);
-
   return (
-    <div className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 backdrop-blur-sm h-full flex flex-col">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-            <span 
-              className="w-2.5 h-2.5 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]" 
-              style={{ backgroundColor: genreConfig.primaryColor }}
-            ></span>
-            Spectral Lab
-          </h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
-              Resolution: <span className="text-zinc-300 font-mono">{genreConfig.fftSize} BIN</span>
-            </p>
-            <span className="text-zinc-800">|</span>
-            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
-              Mode: <span className="text-zinc-300 font-bold" style={{ color: genreConfig.primaryColor }}>{selectedGenre?.sub || 'LINEAR'}</span>
-            </p>
+    <div id="analyzer-main-container" className="bg-zinc-900/50 p-6 rounded-2xl border border-zinc-800 backdrop-blur-sm h-full flex flex-col gap-6">
+      <header className="flex justify-between items-center">
+        <div className="flex gap-4 p-1 bg-zinc-950 border border-zinc-800 rounded-xl w-fit">
+          <button 
+            onClick={() => setMode('realtime')}
+            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'realtime' ? 'bg-blue-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            Live Spectrum
+          </button>
+          <button 
+            onClick={() => setMode('reference')}
+            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${mode === 'reference' ? 'bg-blue-600 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            Reference Lab
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <ExportMenu onExport={handleExport} />
+        </div>
+      </header>
+
+      {mode === 'realtime' ? (
+        <div className="flex-1 flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500 shadow-glow"></span>
+              Spectral DNA
+            </h2>
+            <button 
+              onClick={isActive ? () => setIsActive(false) : startAnalysis}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest ${isActive ? 'bg-zinc-800 text-zinc-500' : 'bg-blue-600 text-white'}`}
+            >
+              {isActive ? "Pause Feed" : "Start Pulse"}
+            </button>
+          </div>
+          <div className="flex-1 bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden relative">
+            <canvas ref={canvasRef} width={800} height={350} className="w-full h-full" />
+            {!isActive && <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-zinc-600 text-xs uppercase font-black tracking-widest">Feed Standby</div>}
           </div>
         </div>
-        {!isActive ? (
-          <button 
-            onClick={startAnalysis}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors shadow-lg shadow-blue-900/20 font-bold uppercase tracking-widest"
-          >
-            Activate Matrix
-          </button>
-        ) : (
-          <div className="flex gap-1 overflow-x-auto max-w-[300px] scrollbar-hide pb-1">
-            {INSTRUMENT_PROFILES.map(p => (
-              <button
-                key={p.name}
-                onClick={() => setSelectedProfile(selectedProfile?.name === p.name ? null : p)}
-                className={`px-3 py-1.5 rounded-xl text-[10px] font-bold uppercase transition-all flex items-center gap-1 flex-shrink-0 border ${
-                  selectedProfile?.name === p.name 
-                    ? 'bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/20' 
-                    : 'bg-zinc-800 text-zinc-500 border-zinc-700 hover:bg-zinc-700 hover:text-zinc-300'
-                }`}
-              >
-                <span>{p.icon}</span> {p.name}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="relative flex-1 bg-zinc-950 rounded-xl border border-zinc-800 overflow-hidden shadow-inner">
-        <canvas 
-          ref={canvasRef} 
-          width={800} 
-          height={300} 
-          className="w-full h-full object-cover"
-        />
-        
-        {selectedProfile && (
-          <div className="absolute top-4 right-4 bg-zinc-900/90 border border-zinc-800 p-4 rounded-xl backdrop-blur-md max-w-[240px] shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-            <h4 className="text-[10px] text-blue-400 font-black uppercase mb-3 border-b border-zinc-800 pb-1 flex justify-between items-center">
-              Sonic Intelligence
-              <span className="text-zinc-600">v1.2</span>
-            </h4>
-            
-            <div className="space-y-4">
-              <div>
-                <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-1">Dynamic Profile</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-zinc-950/50 p-1.5 rounded border border-zinc-800">
-                    <p className="text-[7px] text-zinc-600 uppercase">Attack</p>
-                    <p className="text-[9px] text-zinc-300 font-bold">{selectedProfile.attack}</p>
-                  </div>
-                  <div className="bg-zinc-950/50 p-1.5 rounded border border-zinc-800">
-                    <p className="text-[7px] text-zinc-600 uppercase">Sustain</p>
-                    <p className="text-[9px] text-zinc-300 font-bold">{selectedProfile.sustain}</p>
-                  </div>
+      ) : (
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
+          <div className="flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
+            <div className="bg-zinc-950/50 border border-zinc-800 rounded-3xl p-8 space-y-6">
+              <h3 className="text-sm font-black text-blue-500 uppercase tracking-widest">Source Calibration</h3>
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] text-zinc-500 uppercase font-bold">Your Current Mix</label>
+                  <input type="file" accept="audio/*" onChange={(e) => setMixFile(e.target.files?.[0] || null)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-400 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-blue-600 file:text-white" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] text-zinc-500 uppercase font-bold">Professional Reference</label>
+                  <input type="file" accept="audio/*" onChange={(e) => setRefFile(e.target.files?.[0] || null)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-xs text-zinc-400 file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:text-[10px] file:font-black file:bg-purple-600 file:text-white" />
                 </div>
               </div>
-
-              <div>
-                <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-1">Spectral Bands</p>
-                <div className="space-y-1.5">
-                  {selectedProfile.bands.map((b, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: b.color.replace('0.2', '1').replace('0.15', '1') }}></div>
-                      <div className="text-[9px] text-zinc-300">
-                        <span className="font-bold text-zinc-400">{b.label}:</span> {b.min}-{b.max >= 1000 ? `${b.max/1000}k` : b.max}Hz
-                      </div>
+              <button 
+                onClick={performComparison}
+                disabled={!mixFile || !refFile || isAnalyzing}
+                className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-30 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-900/20"
+              >
+                {isAnalyzing ? "Processing Waveforms..." : "Analyze Differences"}
+              </button>
+            </div>
+            
+            {comparison && (
+              <div className="bg-zinc-950/30 border border-zinc-800 rounded-3xl p-6 space-y-4">
+                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Correction Blueprint</h4>
+                <div className="space-y-2">
+                  {comparison.correctionBlueprint.map((step, i) => (
+                    <div key={i} className="flex gap-3 items-start p-3 bg-zinc-900/50 border border-zinc-800 rounded-xl">
+                      <span className="text-blue-500 font-bold text-xs">{i+1}.</span>
+                      <p className="text-xs text-zinc-300 leading-relaxed">{step}</p>
                     </div>
                   ))}
                 </div>
               </div>
+            )}
+          </div>
 
-              <div>
-                <p className="text-[8px] text-zinc-500 uppercase font-black tracking-widest mb-1">Genre Utility</p>
-                <div className="flex flex-wrap gap-1">
-                  {selectedProfile.genreUseCases.map(g => (
-                    <span key={g} className="px-1.5 py-0.5 bg-zinc-800/50 border border-zinc-700 rounded text-[7px] text-zinc-400 uppercase font-bold">
-                      {g}
-                    </span>
-                  ))}
+          <div className="bg-zinc-900/60 rounded-3xl border border-zinc-800 p-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar">
+            {isAnalyzing ? (
+               <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center opacity-50">
+                  <div className="w-10 h-10 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Spectral AI Comparison in progress...</p>
+               </div>
+            ) : comparison ? (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4">
+                <div>
+                  <h5 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Tonal Balance</h5>
+                  <p className="text-sm text-zinc-300 leading-relaxed italic">"{comparison.tonalBalance}"</p>
+                </div>
+                <div>
+                  <h5 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Dynamic Range</h5>
+                  <p className="text-sm text-zinc-300 leading-relaxed italic">"{comparison.dynamicsCompare}"</p>
+                </div>
+                <div>
+                  <h5 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Stereo Field</h5>
+                  <p className="text-sm text-zinc-300 leading-relaxed italic">"{comparison.stereoDepth}"</p>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center opacity-30 text-center">
+                 <div className="text-5xl mb-4">🔬</div>
+                 <p className="text-xs font-bold uppercase tracking-widest max-w-[200px]">Upload Tracks to Decode Pro Mastering Secrets</p>
+              </div>
+            )}
           </div>
-        )}
-
-        {/* Real-time Indicator Overlay */}
-        <div className="absolute bottom-2 left-2 flex items-center gap-1.5 px-2 py-1 bg-black/40 rounded border border-white/5 backdrop-blur-sm">
-           <div className="w-1 h-1 rounded-full bg-blue-500 animate-ping"></div>
-           <span className="text-[7px] text-zinc-500 font-black uppercase tracking-widest">Real-time Stream Analysis Active</span>
         </div>
-      </div>
-
-      <div className="mt-4 flex justify-between text-[10px] text-zinc-600 font-mono font-bold tracking-tighter">
-        <span>20Hz (SUB)</span>
-        <span>200Hz (BASS)</span>
-        <span>2kHz (MID)</span>
-        <span>20kHz (AIR)</span>
-      </div>
+      )}
     </div>
   );
 };

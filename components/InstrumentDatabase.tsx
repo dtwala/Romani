@@ -1,8 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 import { InstrumentSpec, SelectedGenre, DAWType } from '../types';
 import { DAW_PROFILES } from '../data/daws';
+import ExportMenu from './ExportMenu';
+import { exportToPDF, exportToDocx, exportToImage } from '../utils/exportUtils';
 
 interface InstrumentDatabaseProps {
   activeDAW: DAWType;
@@ -13,6 +15,23 @@ interface InstrumentDatabaseProps {
 const InstrumentDatabase: React.FC<InstrumentDatabaseProps> = ({ activeDAW, instrumentName, genre }) => {
   const [spec, setSpec] = useState<InstrumentSpec | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleExport = async (format: 'pdf' | 'docx' | 'png' | 'jpg') => {
+    if (!spec) return;
+    
+    const title = `Technical Spec: ${spec.name} (${spec.category})`;
+    const sections = [
+      { heading: 'Acoustic Property', content: `Fundamental: ${spec.fundamental}\nHarmonic Profile: ${spec.harmonicProfile}` },
+      { heading: 'Cultural & Sonic Role', content: spec.roleInGenre },
+      { heading: 'EQ Strategy', content: spec.eqSweetSpots.map(s => `${s.range}: ${s.effect}`).join('\n') },
+      { heading: 'Dynamics Architecture', content: `Ratio: ${spec.compression.ratio}\nAttack: ${spec.compression.attack}\nRelease: ${spec.compression.release}\nNotes: ${spec.compression.notes}\nImpact: ${spec.compression.impact}` },
+      { heading: 'Spatial Positioning', content: `Panning: ${spec.stereoField.panning}\nWidth: ${spec.stereoField.width}\nAdvice: ${spec.stereoField.positioningAdvice}` }
+    ];
+
+    if (format === 'pdf') await exportToPDF(title, sections, `spec_${spec.name.toLowerCase()}`);
+    else if (format === 'docx') await exportToDocx(title, sections, `spec_${spec.name.toLowerCase()}`);
+    else if (format === 'png' || format === 'jpg') await exportToImage('instrument-spec-container', format, `spec_${spec.name.toLowerCase()}`);
+  };
 
   const fetchSpecs = async () => {
     if (!instrumentName) return;
@@ -26,40 +45,31 @@ const InstrumentDatabase: React.FC<InstrumentDatabaseProps> = ({ activeDAW, inst
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
         contents: `You are a Studio Technical Librarian. Provide an exhaustive engineering specification for the instrument "${instrumentName}" ${genre ? `within the context of the genre "${genre.sub}"` : ''}. 
-        
         The user is using ${activeDAW}.
-        
-        DAW CONTEXT:
-        - Terminology: ${daw.terminology.join(', ')}.
-        - Stock processing tools: ${daw.stockPlugins.join(', ')}.
-        - ${daw.reasoningInjection}
-
-        Focus on surgical technical details that an engineer needs for a professional mix in ${activeDAW}.
         
         Return the data in the following JSON structure:
         {
-          "name": "Instrument Name",
+          "name": "${instrumentName}",
           "category": "Instrument Category",
-          "fundamental": "Fundamental frequency range (e.g., 80Hz - 200Hz)",
-          "roleInGenre": "A deep 2-3 sentence analysis of the instrument's cultural and technical role. Explain specifically how its usage, engineering treatment, and emotional purpose shift between different genres (e.g., how a snare differs in Jazz vs. Modern Trap).",
-          "eqSweetSpots": [{"range": "Freq Range", "effect": "Detailed mixing result in ${activeDAW}"}],
-          "problemRanges": [{"range": "Freq Range", "effect": "Problem encountered"}],
-          "compression": {"ratio": "X:1", "attack": "X ms", "release": "X ms", "notes": "Implementation using ${activeDAW} stock tools"},
+          "fundamental": "Fundamental range",
+          "roleInGenre": "Cultural/Sonic Role",
+          "eqSweetSpots": [{"range": "Freq", "effect": "Mixing result"}],
+          "problemRanges": [{"range": "Freq", "effect": "Encountered issue"}],
+          "compression": {
+            "ratio": "X:1", 
+            "attack": "Xms", 
+            "release": "Xms", 
+            "notes": "Implementation using ${activeDAW} tools",
+            "impact": "Detail exactly how these specific compression settings (ratio, attack, release) allow this instrument to cut through or sit in a ${genre?.sub || 'modern'} mix."
+          },
           "stereoField": {
-            "panning": "Specific panning advice (e.g. 'Center', '50% Left', 'Hard L/R')",
-            "width": "Stereo width recommendation (e.g. 'Mono', 'Narrow', 'Wide', '120%')",
-            "positioningAdvice": "How to avoid clashing with other elements in ${genre ? genre.sub : 'a mix'}"
+            "panning": "Advice",
+            "width": "Recommendation",
+            "positioningAdvice": "Clash avoidance"
           },
-          "stereoStrategy": "Detailed panning/width approach for ${activeDAW}",
-          "harmonicProfile": "Analysis of harmonic content",
-          "transientProfile": {
-            "attack": "Detailed analysis of the sound's onset",
-            "sustain": "How the energy decays and rings out",
-            "decayNotes": "Engineering advice for ${activeDAW} envelope shaping"
-          },
-          "genreUtility": [
-            {"genre": "Genre Name", "role": "How this instrument typically sits in the mix for this genre"}
-          ]
+          "harmonicProfile": "Texture analysis",
+          "transientProfile": { "attack": "Onset", "sustain": "Decay", "decayNotes": "Advice" },
+          "genreUtility": [{"genre": "Name", "role": "How it sits"}]
         }`,
         config: {
           responseMimeType: "application/json",
@@ -95,16 +105,16 @@ const InstrumentDatabase: React.FC<InstrumentDatabaseProps> = ({ activeDAW, inst
   }
 
   return (
-    <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden">
+    <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8 relative">
+      <div className="absolute top-0 right-0 z-50">
+        {spec && <ExportMenu onExport={handleExport} />}
+      </div>
+
+      <div id="instrument-spec-container" className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden p-4">
         {/* Left Column: EQ & Tone */}
         <div className="lg:col-span-8 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
           {/* Header Card */}
-          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-               <span className="text-9xl font-black">{instrumentName[0]}</span>
-            </div>
-            
+          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md relative overflow-hidden shadow-2xl">
             <header className="relative z-10">
               <h3 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-1">{activeDAW} Technical Spec Sheet</h3>
               <h2 className="text-4xl font-black text-white mb-2">{instrumentName}</h2>
@@ -126,10 +136,10 @@ const InstrumentDatabase: React.FC<InstrumentDatabaseProps> = ({ activeDAW, inst
             </div>
           </div>
 
-          {/* New Prominent: Heritage & Sonic Role */}
-          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md relative overflow-hidden border-l-4 border-l-pink-500">
+          {/* Heritage Section */}
+          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md relative overflow-hidden border-l-4 border-l-pink-500 shadow-xl">
             <h4 className="text-[10px] font-black text-pink-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
               Sonic Heritage & Global Role
             </h4>
             {isLoading ? (
@@ -138,97 +148,93 @@ const InstrumentDatabase: React.FC<InstrumentDatabaseProps> = ({ activeDAW, inst
                 <div className="h-4 bg-zinc-800 rounded w-5/6"></div>
               </div>
             ) : spec && (
-              <div className="animate-in fade-in duration-700">
-                <p className="text-[13px] text-zinc-200 leading-relaxed font-medium italic">
-                  "{spec.roleInGenre}"
-                </p>
-                <div className="mt-4 flex items-center gap-4 text-[9px] text-zinc-500 font-bold uppercase tracking-widest border-t border-zinc-800 pt-4">
-                  <span className="flex items-center gap-1.5"><div className="w-1 h-1 rounded-full bg-pink-500"></div> Heritage Context</span>
-                  <span className="flex items-center gap-1.5"><div className="w-1 h-1 rounded-full bg-blue-500"></div> Cultural Utility</span>
-                </div>
-              </div>
+              <p className="text-[13px] text-zinc-200 leading-relaxed font-medium italic">"{spec.roleInGenre}"</p>
             )}
           </div>
 
-          {/* EQ Matrix */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md">
-                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                  Surgical Sweet Spots
-                </h4>
+             <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md shadow-lg">
+                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-4">Surgical Sweet Spots</h4>
                 <div className="space-y-3">
-                   {isLoading ? (
-                     [...Array(3)].map((_, i) => <div key={i} className="h-12 bg-zinc-800/30 rounded-xl animate-pulse"></div>)
-                   ) : spec?.eqSweetSpots.map((spot, i) => (
-                     <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex gap-4 items-center group hover:border-emerald-500/30 transition-all">
+                   {spec?.eqSweetSpots.map((spot, i) => (
+                     <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex gap-4 items-center">
                         <div className="w-12 text-[10px] font-mono font-bold text-emerald-400 text-right">{spot.range}</div>
-                        <div className="text-[11px] text-zinc-400 group-hover:text-zinc-200">{spot.effect}</div>
+                        <div className="text-[11px] text-zinc-400">{spot.effect}</div>
                      </div>
                    ))}
                 </div>
              </div>
 
-             <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md">
-                <h4 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                  Problem Frequencies
-                </h4>
+             <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md shadow-lg">
+                <h4 className="text-[10px] font-black text-red-500 uppercase tracking-widest mb-4">Problem Frequencies</h4>
                 <div className="space-y-3">
-                   {isLoading ? (
-                     [...Array(3)].map((_, i) => <div key={i} className="h-12 bg-zinc-800/30 rounded-xl animate-pulse"></div>)
-                   ) : spec?.problemRanges.map((range, i) => (
-                     <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex gap-4 items-center group hover:border-red-500/30 transition-all">
+                   {spec?.problemRanges.map((range, i) => (
+                     <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex gap-4 items-center">
                         <div className="w-12 text-[10px] font-mono font-bold text-red-400 text-right">{range.range}</div>
-                        <div className="text-[11px] text-zinc-400 group-hover:text-zinc-200">{range.effect}</div>
+                        <div className="text-[11px] text-zinc-400">{range.effect}</div>
                      </div>
                    ))}
                 </div>
              </div>
-          </div>
-
-          {/* Transient Profile */}
-          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-8 backdrop-blur-md">
-            <h4 className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-6">{activeDAW} Transient Analysis</h4>
-            {isLoading ? (
-              <div className="space-y-3 animate-pulse">
-                <div className="h-16 bg-zinc-800/30 rounded-xl"></div>
-                <div className="h-16 bg-zinc-800/30 rounded-xl"></div>
-              </div>
-            ) : spec && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-700">
-                <div className="space-y-2">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold">Attack Stage</span>
-                  <p className="text-xs text-zinc-300 bg-zinc-950/50 p-3 rounded-xl border border-zinc-800 min-h-[60px]">{spec.transientProfile.attack}</p>
-                </div>
-                <div className="space-y-2">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold">Sustain / Decay</span>
-                  <p className="text-xs text-zinc-300 bg-zinc-950/50 p-3 rounded-xl border border-zinc-800 min-h-[60px]">{spec.transientProfile.sustain}</p>
-                </div>
-                <div className="space-y-2">
-                  <span className="text-[10px] text-zinc-500 uppercase font-bold">Envelope Advice</span>
-                  <p className="text-xs text-blue-400/80 bg-blue-900/5 p-3 rounded-xl border border-blue-500/10 min-h-[60px] italic">"{spec.transientProfile.decayNotes}"</p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Right Column: Dynamics & Genre Context */}
+        {/* Right Column: Dynamics & Space */}
         <div className="lg:col-span-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-2">
-          {/* Stereo Field Advisor */}
-          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md">
-             <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                Stereo Field Advisor
-             </h4>
+          {/* Dynamics Target Card */}
+          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md shadow-lg border-t-4 border-t-orange-500">
+             <h4 className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-6">Dynamics Target</h4>
              {isLoading ? (
                <div className="space-y-4 animate-pulse">
-                  <div className="h-16 bg-zinc-800/30 rounded-2xl"></div>
-                  <div className="h-16 bg-zinc-800/30 rounded-2xl"></div>
+                 <div className="h-12 bg-zinc-800 rounded-xl"></div>
+                 <div className="h-32 bg-zinc-800 rounded-xl"></div>
                </div>
              ) : spec && (
-               <div className="space-y-4 animate-in fade-in duration-700">
+               <div className="space-y-6">
+                  <div className="grid grid-cols-3 gap-2">
+                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center group hover:border-orange-500/30 transition-all">
+                        <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Ratio</div>
+                        <div className="text-sm font-bold text-white">{spec.compression.ratio}</div>
+                     </div>
+                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center group hover:border-orange-500/30 transition-all">
+                        <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Attack</div>
+                        <div className="text-sm font-bold text-white">{spec.compression.attack}</div>
+                     </div>
+                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center group hover:border-orange-500/30 transition-all">
+                        <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Release</div>
+                        <div className="text-sm font-bold text-white">{spec.compression.release}</div>
+                     </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <h5 className="text-[9px] text-zinc-400 uppercase font-black mb-2 tracking-widest">Impact on Presence</h5>
+                      <div className="p-4 bg-orange-900/10 border border-orange-500/20 rounded-2xl italic text-[11px] text-zinc-200 leading-relaxed shadow-inner">
+                        "{spec.compression.impact}"
+                      </div>
+                    </div>
+
+                    <div>
+                      <h5 className="text-[9px] text-zinc-400 uppercase font-black mb-2 tracking-widest">Implementation Note</h5>
+                      <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl text-[10px] text-zinc-400 leading-relaxed">
+                        {spec.compression.notes}
+                      </div>
+                    </div>
+                  </div>
+               </div>
+             )}
+          </div>
+
+          {/* Stereo Field Advisor Card */}
+          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md shadow-lg border-t-4 border-t-emerald-500">
+             <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-6">Stereo Field Advisor</h4>
+             {isLoading ? (
+               <div className="space-y-4 animate-pulse">
+                 <div className="h-12 bg-zinc-800 rounded-xl"></div>
+                 <div className="h-20 bg-zinc-800 rounded-xl"></div>
+               </div>
+             ) : spec && (
+               <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                      <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
                         <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Target Panning</div>
@@ -239,82 +245,12 @@ const InstrumentDatabase: React.FC<InstrumentDatabaseProps> = ({ activeDAW, inst
                         <div className="text-xs font-bold text-white">{spec.stereoField.width}</div>
                      </div>
                   </div>
-                  <div className="p-4 bg-emerald-900/5 border border-emerald-500/10 rounded-xl">
-                     <p className="text-[11px] text-zinc-400 leading-relaxed italic">"{spec.stereoField.positioningAdvice}"</p>
-                  </div>
-                  {/* Visual Panning Indicator */}
-                  <div className="relative h-1 bg-zinc-800 rounded-full mt-2 mx-2">
-                    <div className="absolute left-1/2 -translate-x-1/2 h-full w-0.5 bg-zinc-600"></div>
-                    <div className={`absolute top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-emerald-500 glow-blue`} 
-                         style={{ 
-                            left: spec.stereoField.panning.toLowerCase().includes('hard l') ? '5%' : 
-                                  spec.stereoField.panning.toLowerCase().includes('hard r') ? '95%' :
-                                  spec.stereoField.panning.toLowerCase().includes('center') ? '50%' : 
-                                  spec.stereoField.panning.toLowerCase().includes('left') ? '25%' :
-                                  spec.stereoField.panning.toLowerCase().includes('right') ? '75%' : '50%' 
-                         }}></div>
-                    <div className="flex justify-between mt-2">
-                      <span className="text-[7px] text-zinc-600 font-bold">L</span>
-                      <span className="text-[7px] text-zinc-600 font-bold">C</span>
-                      <span className="text-[7px] text-zinc-600 font-bold">R</span>
-                    </div>
+                  <div className="p-4 bg-emerald-900/5 border border-emerald-500/10 rounded-xl italic text-[11px] text-zinc-400 leading-relaxed">
+                     "{spec.stereoField.positioningAdvice}"
                   </div>
                </div>
              )}
           </div>
-
-          {/* Compression Specs */}
-          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md">
-             <h4 className="text-[10px] font-black text-orange-500 uppercase tracking-widest mb-6">Dynamics Target: {activeDAW}</h4>
-             {isLoading ? (
-               <div className="space-y-4 animate-pulse">
-                  <div className="h-20 bg-zinc-800/30 rounded-2xl"></div>
-                  <div className="h-20 bg-zinc-800/30 rounded-2xl"></div>
-               </div>
-             ) : spec && (
-               <div className="space-y-4 animate-in fade-in duration-700">
-                  <div className="grid grid-cols-3 gap-2">
-                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
-                        <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Ratio</div>
-                        <div className="text-sm font-bold text-white">{spec.compression.ratio}</div>
-                     </div>
-                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
-                        <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Attack</div>
-                        <div className="text-sm font-bold text-white">{spec.compression.attack}</div>
-                     </div>
-                     <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-center">
-                        <div className="text-[8px] text-zinc-500 uppercase font-bold mb-1">Release</div>
-                        <div className="text-sm font-bold text-white">{spec.compression.release}</div>
-                     </div>
-                  </div>
-                  <div className="p-4 bg-orange-900/5 border border-orange-500/10 rounded-xl">
-                     <p className="text-[11px] text-zinc-400 leading-relaxed italic">"{spec.compression.notes}"</p>
-                  </div>
-               </div>
-             )}
-          </div>
-
-          {/* Genre Utility */}
-          <div className="bg-zinc-900/40 rounded-3xl border border-zinc-800 p-6 backdrop-blur-md">
-            <h4 className="text-[10px] font-black text-purple-500 uppercase tracking-widest mb-4">Genre Role & Utility</h4>
-            <div className="space-y-3">
-              {isLoading ? (
-                [...Array(2)].map((_, i) => <div key={i} className="h-16 bg-zinc-800/30 rounded-xl animate-pulse"></div>)
-              ) : spec?.genreUtility.map((util, i) => (
-                <div key={i} className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 group hover:border-purple-500/30 transition-all">
-                  <div className="text-[9px] font-black text-purple-400 uppercase mb-1">{util.genre}</div>
-                  <div className="text-[11px] text-zinc-400 leading-relaxed group-hover:text-zinc-200">{util.role}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <button 
-            onClick={fetchSpecs}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl transition-all shadow-lg shadow-blue-900/20 active:scale-[0.98]"
-          >
-            Update Technical Data
-          </button>
         </div>
       </div>
     </div>
