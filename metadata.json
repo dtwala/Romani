@@ -1,0 +1,7 @@
+{
+  "name": "Romani Engineer AI",
+  "description": "A high-end audio production and sound engineering assistant providing real-time technical advice, engineering calculators, and live voice-activated studio support.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
